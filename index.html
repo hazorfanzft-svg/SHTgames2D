@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SHTgames — 3D и 2D игры</title>
+    <style>
+        :root {
+            --bg: #0b0c10; --card-bg: #1f2833; --accent: #66fcf1;
+            --accent2: #45a29e; --text: #c5c6c7; --white: #fff;
+            --shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { background:var(--bg); font-family:'Segoe UI',sans-serif; color:var(--text); min-height:100vh; }
+        .header {
+            background:linear-gradient(135deg,#0b0c10,#1f2833); padding:20px 30px;
+            display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap;
+            border-bottom:2px solid var(--accent2); box-shadow:0 4px 15px rgba(102,252,241,0.15);
+        }
+        .logo { font-size:2.5rem; font-weight:800; color:var(--accent); letter-spacing:2px; }
+        .logo span { color:var(--white); }
+        .tabs { display:flex; gap:15px; margin:20px 0; justify-content:center; }
+        .tab-btn {
+            background:#1f2833; border:1px solid #45a29e50; color:var(--text);
+            padding:10px 30px; border-radius:30px; cursor:pointer; font-weight:600;
+            transition:all 0.3s; font-size:1rem;
+        }
+        .tab-btn.active, .tab-btn:hover { background:var(--accent); color:#0b0c10; border-color:var(--accent); }
+        .games-grid {
+            display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr));
+            gap:20px; max-width:1400px; margin:20px auto; padding:20px;
+        }
+        .game-card {
+            background:var(--card-bg); border-radius:18px; overflow:hidden;
+            box-shadow:var(--shadow); transition:transform 0.3s,border 0.3s;
+            border:1px solid transparent; display:flex; flex-direction:column; cursor:pointer;
+        }
+        .game-card:hover { transform:translateY(-8px); border-color:var(--accent); box-shadow:0 15px 30px rgba(0,0,0,0.7); }
+        .game-image {
+            height:130px; background:#2c3e50; display:flex; align-items:center;
+            justify-content:center; font-size:3rem; color:#ffffff40;
+        }
+        .game-info { padding:14px; flex:1; display:flex; flex-direction:column; }
+        .game-title { font-weight:700; font-size:1rem; margin-bottom:5px; color:var(--white); }
+        .game-type { font-size:0.8rem; color:var(--accent); margin-bottom:10px; text-transform:uppercase; }
+        .play-button {
+            margin-top:auto; background:var(--accent2); border:none; color:#0b0c10;
+            padding:8px; border-radius:25px; font-weight:bold; font-size:0.9rem;
+            cursor:pointer; transition:0.3s; text-align:center;
+        }
+        .play-button:hover { background:var(--accent); transform:scale(1.03); }
+
+        .modal { display:none; position:fixed; z-index:1000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.9); justify-content:center; align-items:center; }
+        .modal.active { display:flex; }
+        .modal-content {
+            background:#1f2833; border-radius:20px; padding:20px; position:relative;
+            max-width:800px; width:95%; box-shadow:0 0 40px rgba(102,252,241,0.3); text-align:center;
+        }
+        .close-modal { position:absolute; top:15px; right:20px; font-size:2rem; color:var(--accent); cursor:pointer; background:none; border:none; z-index:10; }
+        canvas { display:block; margin:0 auto; border-radius:12px; border:2px solid var(--accent); }
+        .three-container { width:100%; height:400px; border-radius:12px; overflow:hidden; border:2px solid var(--accent); }
+        .game-ui { display:flex; justify-content:space-between; color:white; font-weight:bold; margin:10px 0; font-size:1.1rem; }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="logo"><i class="fas fa-gamepad"></i> SHT<span>games</span></div>
+    </header>
+
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="3d">🎮 3D Игры (5)</button>
+        <button class="tab-btn" data-tab="2d">🕹️ 2D Игры (10)</button>
+    </div>
+
+    <div class="games-grid" id="gamesGrid"></div>
+
+    <div class="modal" id="gameModal">
+        <div class="modal-content">
+            <button class="close-modal" id="closeModal">&times;</button>
+            <div id="gameArea"></div>
+        </div>
+    </div>
+
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // ========== ИГРЫ ==========
+        const games3D = [
+            { id: '3d1', title: 'Cube Clicker', type: '3D', icon: '🎯', gameId: 1 },
+            { id: '3d2', title: 'Dodge Arena', type: '3D', icon: '💨', gameId: 2 },
+            { id: '3d3', title: 'Sphere Collector', type: '3D', icon: '🟡', gameId: 3 },
+            { id: '3d4', title: 'Shooting Range', type: '3D', icon: '🔫', gameId: 4 },
+            { id: '3d5', title: '3D Maze', type: '3D', icon: '🏁', gameId: 5 }
+        ];
+
+        const games2D = [
+            { id: '2d1', title: 'Coin Rush', type: '2D', icon: '🪙', gameId: 1 },
+            { id: '2d2', title: 'Dodge Fall', type: '2D', icon: '🏃', gameId: 2 },
+            { id: '2d3', title: 'Clicker Ball', type: '2D', icon: '👆', gameId: 3 },
+            { id: '2d4', title: 'Arkanoid', type: '2D', icon: '🧱', gameId: 4 },
+            { id: '2d5', title: 'Memory Match', type: '2D', icon: '🧠', gameId: 5 },
+            { id: '2d6', title: 'Tetris Lite', type: '2D', icon: '🧩', gameId: 6 },
+            { id: '2d7', title: 'Snake', type: '2D', icon: '🐍', gameId: 7 },
+            { id: '2d8', title: '15 Puzzle', type: '2D', icon: '🔢', gameId: 8 },
+            { id: '2d9', title: 'Quiz Time', type: '2D', icon: '❓', gameId: 9 },
+            { id: '2d10', title: 'Maze Runner', type: '2D', icon: '🏁', gameId: 10 }
+        ];
+
+        let activeTab = '3d';
+
+        // ========== ОТРИСОВКА СЕТКИ ==========
+        function renderGrid() {
+            const grid = document.getElementById('gamesGrid');
+            const games = activeTab === '3d' ? games3D : games2D;
+            grid.innerHTML = games.map(g => `
+                <div class="game-card" data-type="${g.type}" data-gameid="${g.gameId}" data-title="${g.title}">
+                    <div class="game-image">${g.icon}</div>
+                    <div class="game-info">
+                        <div class="game-title">${g.title}</div>
+                        <div class="game-type">${g.type}</div>
+                        <button class="play-button">Играть</button>
+                    </div>
+                </div>
+            `).join('');
+
+            document.querySelectorAll('.game-card').forEach(card => {
+                card.addEventListener('click', () => {
+                    const type = card.dataset.type;
+                    const gameId = parseInt(card.dataset.gameid);
+                    const title = card.dataset.title;
+                    openGame(type, gameId, title);
+                });
+            });
+        }
+
+        // Вкладки
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                activeTab = btn.dataset.tab;
+                closeCurrentGame();
+                renderGrid();
+            });
+        });
+
+        // ========== МОДАЛЬНОЕ ОКНО ==========
+        const modal = document.getElementById('gameModal');
+        const gameArea = document.getElementById('gameArea');
+        let currentGame = null;  // { stop() }
+
+        function closeCurrentGame() {
+            if (currentGame && currentGame.stop) currentGame.stop();
+            currentGame = null;
+            modal.classList.remove('active');
+        }
+
+        document.getElementById('closeModal').addEventListener('click', closeCurrentGame);
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && modal.classList.contains('active')) closeCurrentGame();
+        });
+
+        function openGame(type, gameId, title) {
+            closeCurrentGame();
+            modal.classList.add('active');
+            gameArea.innerHTML = `<h2 style="color:var(--accent); margin-bottom:10px;">${title}</h2>`;
+
+            if (type === '3D') {
+                // Создаём контейнер для Three.js
+                const container = document.createElement('div');
+                container.className = 'three-container';
+                container.id = 'threeContainer';
+                gameArea.appendChild(container);
+                // Запускаем нужную 3D игру
+                if (gameId === 1) start3D_CubeClicker(container);
+                else if (gameId === 2) start3D_DodgeArena(container);
+                else if (gameId === 3) start3D_SphereCollector(container);
+                else if (gameId === 4) start3D_ShootingRange(container);
+                else if (gameId === 5) start3D_Maze(container);
+            } else {
+                // 2D игра добавляет canvas и UI
+                if (gameId === 1) start2D_CoinRush();
+                else if (gameId === 2) start2D_DodgeFall();
+                else if (gameId === 3) start2D_ClickerBall();
+                else if (gameId === 4) start2D_Arkanoid();
+                else if (gameId === 5) start2D_Memory();
+                else if (gameId === 6) start2D_Tetris();
+                else if (gameId === 7) start2D_Snake();
+                else if (gameId === 8) start2D_Puzzle15();
+                else if (gameId === 9) start2D_Quiz();
+                else if (gameId === 10) start2D_Maze();
+            }
+        }
+
+        // ==================== 3D ИГРЫ (THREE.JS) ====================
+        function createScene(container) {
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x2c3e50);
+            const camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
+            camera.position.z = 5;
+            const renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            container.appendChild(renderer.domElement);
+            // свет
+            const light = new THREE.DirectionalLight(0xffffff, 1);
+            light.position.set(5, 10, 5);
+            scene.add(light);
+            scene.add(new THREE.AmbientLight(0x404040));
+            return { scene, camera, renderer };
+        }
+
+        // 1. Cube Clicker
+        function start3D_CubeClicker(container) {
+            const { scene, camera, renderer } = createScene(container);
+            const geometry = new THREE.BoxGeometry(1, 1, 1);
+            const material = new THREE.MeshStandardMaterial({ color: 0x66fcf1, emissive: new THREE.Color(0x112233) });
+            const cube = new THREE.Mesh(geometry, material);
+            scene.add(cube);
+            let clicks = 0;
+            const target = 20;
+            const counterDiv = document.createElement('div');
+            counterDiv.style.color = 'white';
+            counterDiv.style.marginTop = '10px';
+            counterDiv.textContent = `Кликов: 0 / ${target}`;
+            container.parentNode.insertBefore(counterDiv, container.nextSibling);
+
+            const raycaster = new THREE.Raycaster();
+            const mouse = new THREE.Vector2();
+            const onClick = (event) => {
+                const rect = renderer.domElement.getBoundingClientRect();
+                mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+                mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+                raycaster.setFromCamera(mouse, camera);
+                const intersects = raycaster.intersectObject(cube);
+                if (intersects.length > 0) {
+                    clicks++;
+                    counterDiv.textContent = `Кликов: ${clicks} / ${target}`;
+                    cube.material.color.setHex(Math.random() * 0xffffff);
+                    if (clicks >= target) {
+                        alert('Победа! Вы кликнули куб 20 раз.');
+                        active = false;
+                    }
+                }
+            };
+            renderer.domElement.addEventListener('click', onClick);
+            let active = true;
+            function animate() {
+                if (!active) return;
+                requestAnimationFrame(animate);
+                cube.rotation.x += 0.01;
+                cube.rotation.y += 0.01;
+                renderer.render(scene, camera);
+            }
+            animate();
+            currentGame = {
+                stop: () => {
+                    active = false;
+                    renderer.domElement.removeEventListener('click', onClick);
+                    renderer.dispose();
+                    container.innerHTML = '';
+                    if (counterDiv.parentNode) counterDiv.parentNode.removeChild(counterDiv);
+                }
+            };
+        }
+
+        // 2. Dodge Arena
+        function start3D_DodgeArena(container) {
+            const { scene, camera, renderer } = createScene(container);
+            camera.position.z = 10;
+            const player = new THREE.Mesh(new THREE.SphereGeometry(0.5), new THREE.MeshStandardMaterial({ color: 0x66fcf1 }));
+            player.position.y = -3;
+            scene.add(player);
+            const enemies = [];
+            let spawnTimer = 0;
+            let lives = 3;
+            let score = 0;
+            const uiDiv = document.createElement('div');
+            uiDiv.style.color = 'white';
+            uiDiv.textContent = `Жизни: ${lives} | Очки: ${score}`;
+            container.parentNode.insertBefore(uiDiv, container.nextSibling);
+            const keys = {};
+            const onKey = (e) => { keys[e.key] = true; e.preventDefault(); };
+            const offKey = (e) => { keys[e.key] = false; };
+            window.addEventListener('keydown', onKey);
+            window.addEventListener('keyup', offKey);
+            let active = true;
+            function animate() {
+                if (!active) return;
+                requestAnimationFrame(animate);
+                if (keys['ArrowLeft'] || keys['a']) player.position.x -= 0.15;
+                if (keys['ArrowRight'] || keys['d']) player.position.x += 0.15;
+                player.position.x = Math.max(-4, Math.min(4, player.position.x));
+                spawnTimer++;
+                if (spawnTimer > 40) {
+                    const enemy = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 0.8), new THREE.MeshStandardMaterial({ color: 0xe74c3c }));
+                    enemy.position.x = (Math.random() - 0.5) * 8;
+                    enemy.position.y = 5;
+                    scene.add(enemy);
+                    enemies.push(enemy);
+                    spawnTimer = 0;
+                }
+                for (let i = enemies.length-1; i >= 0; i--) {
+                    enemies[i].position.y -= 0.1;
+                    if (enemies[i].position.y < -5) {
+                        scene.remove(enemies[i]);
+                        enemies.splice(i,1);
+                        score++;
+                    } else if (Math.abs(enemies[i].position.x - player.position.x) < 0.9 &&
+                               Math.abs(enemies[i].position.y - player.position.y) < 0.9) {
+                        scene.remove(enemies[i]);
+                        enemies.splice(i,1);
+                        lives--;
+                        if (lives <= 0) {
+                            active = false;
+                            alert('Игра окончена! Ваш счёт: ' + score);
+                        }
+                    }
+                }
+                uiDiv.textContent = `Жизни: ${lives} | Очки: ${score}`;
+                renderer.render(scene, camera);
+            }
+            animate();
+            currentGame = {
+                stop: () => {
+                    active = false;
+                    window.removeEventListener('keydown', onKey);
+                    window.removeEventListener('keyup', offKey);
+                    renderer.dispose();
+                    container.innerHTML = '';
+                    if (uiDiv.parentNode) uiDiv.parentNode.removeChild(uiDiv);
+                }
+            };
+        }
+
+        // 3. Sphere Collector
+        function start3D_SphereCollector(container) {
+            const { scene, camera, renderer } = createScene(container);
+            camera.position.z = 10;
+            const player = new THREE.Mesh(new THREE.SphereGeometry(0.5), new THREE.MeshStandardMaterial({ color: 0x66fcf1 }));
+            scene.add(player);
+            const spheres = [];
+            for (let i=0; i<8; i++) {
+                const s = new THREE.Mesh(new THREE.SphereGeometry(0.3), new THREE.MeshStandardMaterial({ color: 0xf1c40f }));
+                s.position.set((Math.random()-0.5)*8, (Math.random()-0.5)*6, 0);
+                scene.add(s);
+                spheres.push(s);
+            }
+            let collected = 0;
+            const uiDiv = document.createElement('div');
+            uiDiv.style.color = 'white';
+            uiDiv.textContent = `Собрано: 0 / ${spheres.length}`;
+            container.parentNode.insertBefore(uiDiv, container.nextSibling);
+            const keys = {};
+            const onKey = (e) => { keys[e.key] = true; e.preventDefault(); };
+            const offKey = (e) => { keys[e.key] = false; };
+            window.addEventListener('keydown', onKey);
+            window.addEventListener('keyup', offKey);
+            let active = true;
+            function animate() {
+                if (!active) return;
+                requestAnimationFrame(animate);
+                if (keys['ArrowUp'] || keys['w']) player.position.y += 0.1;
+                if (keys['ArrowDown'] || keys['s']) player.position.y -= 0.1;
+                if (keys['ArrowLeft'] || keys['a']) player.position.x -= 0.1;
+                if (keys['ArrowRight'] || keys['d']) player.position.x += 0.1;
+                player.position.x = Math.max(-4.5, Math.min(4.5, player.position.x));
+                player.position.y = Math.max(-3.5, Math.min(3.5, player.position.y));
+                for (let i = spheres.length-1; i >= 0; i--) {
+                    const dist = player.position.distanceTo(spheres[i].position);
+                    if (dist < 0.8) {
+                        scene.remove(spheres[i]);
+                        spheres.splice(i,1);
+                        collected++;
+                        uiDiv.textContent = `Собрано: ${collected} / ${spheres.length + collected}`;
+                    }
+                }
+                if (spheres.length === 0) {
+                    active = false;
+                    alert('Все сферы собраны!');
+                }
+                renderer.render(scene, camera);
+            }
+            animate();
+            currentGame = {
+                stop: () => {
+                    active = false;
+                    window.removeEventListener('keydown', onKey);
+                    window.removeEventListener('keyup', offKey);
+                    renderer.dispose();
+                    container.innerHTML = '';
+                    if (uiDiv.parentNode) uiDiv.parentNode.removeChild(uiDiv);
+                }
+            };
+        }
+
+        // 4. Shooting Range
+        function start3D_ShootingRange(container) {
+            const { scene, camera, renderer } = createScene(container);
+            camera.position.z = 5;
+            const targets = [];
+            for (let i=0; i<5; i++) {
+                const t = new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.3,0.1,32), new THREE.MeshStandardMaterial({ color: 0xe74c3c }));
+                t.position.set((Math.random()-0.5)*6, (Math.random()-0.5)*4, 0);
+                scene.add(t);
+                targets.push(t);
+            }
+            let score = 0;
+            const uiDiv = document.createElement('div');
+            uiDiv.style.color = 'white';
+            uiDiv.textContent = `Попаданий: ${score} / 5`;
+            container.parentNode.insertBefore(uiDiv, container.nextSibling);
+            const raycaster = new THREE.Raycaster();
+            const mouse = new THREE.Vector2();
+            const onClick = (event) => {
+                const rect = renderer.domElement.getBoundingClientRect();
+                mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+                mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+                raycaster.setFromCamera(mouse, camera);
+                const intersects = raycaster.intersectObjects(targets);
+                if (intersects.length > 0) {
+                    const obj = intersects[0].object;
+                    scene.remove(obj);
+                    targets.splice(targets.indexOf(obj), 1);
+                    score++;
+                    uiDiv.textContent = `Попаданий: ${score} / 5`;
+                    if (targets.length === 0) {
+                        active = false;
+                        alert('Все мишени поражены!');
+                    }
+                }
+            };
+            renderer.domElement.addEventListener('click', onClick);
+            let active = true;
+            function animate() {
+                if (!active) return;
+                requestAnimationFrame(animate);
+                targets.forEach(t => { t.rotation.y += 0.02; });
+                renderer.render(scene, camera);
+            }
+            animate();
+            currentGame = {
+                stop: () => {
+                    active = false;
+                    renderer.domElement.removeEventListener('click', onClick);
+                    renderer.dispose();
+                    container.innerHTML = '';
+                    if (uiDiv.parentNode) uiDiv.parentNode.removeChild(uiDiv);
+                }
+            };
+        }
+
+        // 5. 3D Maze (вид сверху)
+        function start3D_Maze(container) {
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x2c3e50);
+            const camera = new THREE.PerspectiveCamera(60, container.clientWidth/container.clientHeight, 0.1, 100);
+            camera.position.set(7, 10, 7);
+            camera.lookAt(0,0,0);
+            const renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            container.appendChild(renderer.domElement);
+            scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+            const light = new THREE.DirectionalLight(0xffffff, 0.8);
+            light.position.set(5,10,5);
+            scene.add(light);
+            // стены
+            const wallMat = new THREE.MeshStandardMaterial({ color: 0x34495e });
+            const mazeLayout = [
+                [1,1,1,1,1,1,1,1,1,1],
+                [1,0,0,0,1,0,0,0,0,1],
+                [1,0,1,0,1,0,1,1,0,1],
+                [1,0,1,0,0,0,0,1,0,1],
+                [1,0,1,1,1,1,0,1,0,1],
+                [1,0,0,0,0,0,0,0,0,1],
+                [1,0,1,1,1,1,1,1,0,1],
+                [1,0,0,0,0,0,0,0,0,1],
+                [1,1,1,1,1,1,1,1,1,1]
+            ];
+            for (let z=0; z<9; z++) {
+                for (let x=0; x<10; x++) {
+                    if (mazeLayout[z][x] === 1) {
+                        const wall = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), wallMat);
+                        wall.position.set(x-4.5, 0.5, z-4);
+                        scene.add(wall);
+                    }
+                }
+            }
+            // игрок
+            const player = new THREE.Mesh(new THREE.SphereGeometry(0.3), new THREE.MeshStandardMaterial({ color: 0x66fcf1 }));
+            player.position.set(-3.5, 0.5, -3.5); // старт
+            scene.add(player);
+            const finishPos = new THREE.Vector3(3.5, 0.5, 3.5);
+            const finishMarker = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.2,0.5), new THREE.MeshStandardMaterial({ color: 0x27ae60 }));
+            finishMarker.position.copy(finishPos);
+            scene.add(finishMarker);
+            const keys = {};
+            const onKey = (e) => { keys[e.key] = true; e.preventDefault(); };
+            const offKey = (e) => { keys[e.key] = false; };
+            window.addEventListener('keydown', onKey);
+            window.addEventListener('keyup', offKey);
+            let active = true;
+            function animate() {
+                if (!active) return;
+                requestAnimationFrame(animate);
+                const move = new THREE.Vector3();
+                if (keys['ArrowUp'] || keys['w']) move.z -= 0.15;
+                if (keys['ArrowDown'] || keys['s']) move.z += 0.15;
+                if (keys['ArrowLeft'] || keys['a']) move.x -= 0.15;
+                if (keys['ArrowRight'] || keys['d']) move.x += 0.15;
+                const newPos = player.position.clone().add(move);
+                // проверка коллизий с стенами (упрощённо по сетке)
+                const gridX = Math.round(newPos.x + 4.5);
+                const gridZ = Math.round(newPos.z + 4);
+                if (gridX >=0 && gridX < 10 && gridZ >=0 && gridZ < 9 && mazeLayout[gridZ][gridX] === 0) {
+                    player.position.copy(newPos);
+                }
+                if (player.position.distanceTo(finishPos) < 0.6) {
+                    active = false;
+                    alert('Поздравляем! Вы прошли лабиринт!');
+                }
+                renderer.render(scene, camera);
+            }
+            animate();
+            currentGame = {
+                stop: () => {
+                    active = false;
+                    window.removeEventListener('keydown', onKey);
+                    window.removeEventListener('keyup', offKey);
+                    renderer.dispose();
+                    container.innerHTML = '';
+                }
+            };
+        }
+
+        // ========== 2D ИГРЫ (повторение с прошлого шага) ==========
+        // 1. Coin Rush
+        function start2D_CoinRush() {
+            gameArea.innerHTML += `<div class="game-ui">Монет собрано: <span id="coinCount">0</span> / 10</div>
+                                   <canvas id="gameCanvas" width="500" height="350"></canvas>`;
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+            const counter = document.getElementById('coinCount');
+            let player = { x: 250, y: 175, r: 12, speed: 4 };
+            let coins = [], score = 0, target = 10, active = true;
+            let keys = {};
+            function spawnCoin() {
+                coins.push({ x: Math.random()*(canvas.width-40)+20, y: Math.random()*(canvas.height-40)+20, r: 8 });
+            }
+            for(let i=0;i<6;i++) spawnCoin();
+            function loop() {
+                if(!active) return;
+                if(keys.ArrowUp||keys.w) player.y-=player.speed;
+                if(keys.ArrowDown||keys.s) player.y+=player.speed;
+                if(keys.ArrowLeft||keys.a) player.x-=player.speed;
+                if(keys.ArrowRight||keys.d) player.x+=player.speed;
+                player.x = Math.max(player.r, Math.min(canvas.width-player.r, player.x));
+                player.y = Math.max(player.r, Math.min(canvas.height-player.r, player.y));
+                for(let i=coins.length-1;i>=0;i--){
+                    let dx=player.x-coins[i].x, dy=player.y-coins[i].y;
+                    if(Math.sqrt(dx*dx+dy*dy)<player.r+coins[i].r+2){
+                        coins.splice(i,1); score++; counter.textContent=score; spawnCoin();
+                    }
+                }
+                ctx.clearRect(0,0,canvas.width,canvas.height);
+                coins.forEach(c=>{ctx.beginPath(); ctx.arc(c.x,c.y,c.r,0,Math.PI*2); ctx.fillStyle="#f1c40f"; ctx.fill();});
+                ctx.beginPath(); ctx.arc(player.x,player.y,player.r,0,Math.PI*2); ctx.fillStyle="#66fcf1"; ctx.fill();
+                if(score>=target){ active=false; ctx.fillStyle="rgba(0,0,0,0.7)"; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.fillStyle="#66fcf1"; ctx.font="28px sans-serif"; ctx.textAlign="center"; ctx.fillText("Победа!",canvas.width/2,canvas.height/2); }
+                else requestAnimationFrame(loop);
+            }
+            loop();
+            const onKey = (e)=>{ keys[e.key]=true; if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.key)) e.preventDefault(); };
+            const offKey = (e)=>{ keys[e.key]=false; };
+            window.addEventListener("keydown", onKey); window.addEventListener("keyup", offKey);
+            currentGame = { stop: ()=>{ active=false; window.removeEventListener("keydown",onKey); window.removeEventListener("keyup",offKey); } };
+        }
+
+        // Остальные 2D игры аналогичны из предыдущего ответа, добавлю их кратко для полноты
+        function start2D_DodgeFall() {
+            gameArea.innerHTML += `<div class="game-ui">Очки: <span id="dodgeScore">0</span> | Жизни: <span id="dodgeLives">3</span></div>
+                                   <canvas id="gameCanvas" width="500" height="350"></canvas>`;
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+            const scoreSpan = document.getElementById('dodgeScore');
+            const livesSpan = document.getElementById('dodgeLives');
+            let player = { x:250, y:300, w:30, h:30 };
+            let enemies = [], score=0, lives=3, active=true, spawnTimer=0;
+            let keys={};
+            function spawn(){ enemies.push({x:Math.random()*(canvas.width-30), y:-30, w:30, h:30, speed:2+Math.random()*3}); }
+            function loop(ts){
+                if(!active) return;
+                if(keys.ArrowLeft||keys.a) player.x-=5;
+                if(keys.ArrowRight||keys.d) player.x+=5;
+                player.x = Math.max(0, Math.min(canvas.width-player.w, player.x));
+                spawnTimer++; if(spawnTimer>30){ spawn(); spawnTimer=0; }
+                for(let i=enemies.length-1;i>=0;i--){
+                    enemies[i].y+=enemies[i].speed;
+                    if(enemies[i].y>canvas.height) { enemies.splice(i,1); score++; scoreSpan.textContent=score; }
+                    else if(player.x<enemies[i].x+enemies[i].w && player.x+player.w>enemies[i].x &&
+                            player.y<enemies[i].y+enemies[i].h && player.y+player.h>enemies[i].y){
+                        enemies.splice(i,1); lives--; livesSpan.textContent=lives;
+                        if(lives<=0){ active=false; ctx.fillStyle="rgba(0,0,0,0.8)"; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.fillStyle="#e74c3c"; ctx.font="30px sans-serif"; ctx.fillText("Game Over",canvas.width/2,canvas.height/2); }
+                    }
+                }
+                ctx.clearRect(0,0,canvas.width,canvas.height);
+                ctx.fillStyle="#2ecc71"; ctx.fillRect(player.x,player.y,player.w,player.h);
+                enemies.forEach(e=>{ ctx.fillStyle="#e74c3c"; ctx.fillRect(e.x,e.y,e.w,e.h); });
+                if(active) requestAnimationFrame(loop);
+            }
+            requestAnimationFrame(loop);
+            const onKey=(e)=>{ keys[e.key]=true; e.preventDefault(); };
+            const offKey=(e)=>{ keys[e.key]=false; };
+            window.addEventListener("keydown",onKey); window.addEventListener("keyup",offKey);
+            currentGame={stop:()=>{ active=false; window.removeEventListener("keydown",onKey); window.removeEventListener("keyup",offKey); }};
+        }
+
+        function start2D_ClickerBall() {
+            gameArea.innerHTML += `<div class="game-ui">Нажатий осталось: <span id="clickLeft">20</span></div>
+                                   <canvas id="gameCanvas" width="400" height="300"></canvas>`;
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+            const leftSpan = document.getElementById('clickLeft');
+            let left = 20, active = true, ball = { x:200, y:150, r:40 };
+            function draw(){ ctx.clearRect(0,0,canvas.width,canvas.height); ctx.beginPath(); ctx.arc(ball.x,ball.y,ball.r,0,Math.PI*2); ctx.fillStyle="#e67e22"; ctx.fill(); ctx.fillStyle="white"; ctx.font="bold 18px sans-serif"; ctx.textAlign="center"; ctx.fillText(left,ball.x,ball.y+6); }
+            function onClick(e){
+                if(!active) return;
+                const rect = canvas.getBoundingClientRect();
+                const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+                const dx=mx-ball.x, dy=my-ball.y;
+                if(dx*dx+dy*dy < ball.r*ball.r){
+                    left--; leftSpan.textContent=left;
+                    ball.x = Math.random()*(canvas.width-80)+40;
+                    ball.y = Math.random()*(canvas.height-80)+40;
+                    draw();
+                    if(left<=0){ active=false; ctx.fillStyle="rgba(0,0,0,0.7)"; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.fillStyle="#2ecc71"; ctx.fillText("Молодец!",canvas.width/2,canvas.height/2); }
+                }
+            }
+            canvas.addEventListener("click", onClick);
+            draw();
+            currentGame = { stop: ()=>{ active=false; canvas.removeEventListener("click",onClick); } };
+        }
+
+        function start2D_Arkanoid() {
+            gameArea.innerHTML += `<div class="game-ui">Кирпичей осталось: <span id="bricksLeft">15</span></div>
+                                   <canvas id="gameCanvas" width="500" height="350"></canvas>`;
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+            const bricksSpan = document.getElementById('bricksLeft');
+            let paddle = { x:200, y:330, w:80, h:12 };
+            let ball = { x:250, y:300, r:7, vx:3, vy:-3 };
+            let bricks = [], active = true, left=15, keys={};
+            for(let i=0;i<5;i++) for(let j=0;j<3;j++) bricks.push({x:40+j*70, y:30+i*25, w:60, h:20, alive:true});
+            bricksSpan.textContent=left;
+            function loop(){
+                if(!active) return;
+                if(keys.ArrowLeft||keys.a) paddle.x-=6;
+                if(keys.ArrowRight||keys.d) paddle.x+=6;
+                paddle.x=Math.max(0,Math.min(canvas.width-paddle.w,paddle.x));
+                ball.x+=ball.vx; ball.y+=ball.vy;
+                if(ball.x-ball.r<0||ball.x+ball.r>canvas.width) ball.vx*=-1;
+                if(ball.y-ball.r<0) ball.vy*=-1;
+                if(ball.y+ball.r>canvas.height){ active=false; ctx.fillStyle="rgba(0,0,0,0.8)"; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.fillStyle="#e74c3c"; ctx.fillText("Проигрыш",canvas.width/2,canvas.height/2); return; }
+                if(ball.y+ball.r>paddle.y && ball.y-ball.r<paddle.y+paddle.h && ball.x>paddle.x && ball.x<paddle.x+paddle.w){ ball.vy*=-1; ball.y=paddle.y-ball.r; }
+                for(let b of bricks){
+                    if(!b.alive) continue;
+                    if(ball.x>b.x && ball.x<b.x+b.w && ball.y>b.y && ball.y<b.y+b.h){ b.alive=false; left--; bricksSpan.textContent=left; ball.vy*=-1; if(left<=0){ active=false; ctx.fillStyle="rgba(0,0,0,0.7)"; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.fillStyle="#2ecc71"; ctx.fillText("Вы выиграли!",canvas.width/2,canvas.height/2); } }
+                }
+                ctx.clearRect(0,0,canvas.width,canvas.height);
+                ctx.fillStyle="#66fcf1"; ctx.fillRect(paddle.x,paddle.y,paddle.w,paddle.h);
+                ctx.beginPath(); ctx.arc(ball.x,ball.y,ball.r,0,Math.PI*2); ctx.fillStyle="#f1c40f"; ctx.fill();
+                bricks.forEach(b=>{ if(b.alive){ ctx.fillStyle="#2ecc71"; ctx.fillRect(b.x,b.y,b.w,b.h); } });
+                if(active) requestAnimationFrame(loop);
+            }
+            requestAnimationFrame(loop);
+            const onKey=(e)=>{ keys[e.key]=true; e.preventDefault(); };
+            const offKey=(e)=>{ keys[e.key]=false; };
+            window.addEventListener("keydown",onKey); window.addEventListener("keyup",offKey);
+            currentGame={stop:()=>{ active=false; window.removeEventListener("keydown",onKey); window.removeEventListener("keyup",offKey); }};
+        }
+
+        function start2D_Memory() {
+            gameArea.innerHTML += `<div class="game-ui">Пар найдено: <span id="pairsFound">0</span> / 6</div>
+                                   <canvas id="gameCanvas" width="400" height="300"></canvas>`;
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+            const pairsSpan = document.getElementById('pairsFound');
+            const cardW=70, cardH=90, gap=10, cols=4, rows=3;
+            const symbols = ["🍎","🍌","🍒","🍇","🍊","🍋"];
+            let cards = [], active=true, pairsFound=0, first=null, lock=false;
+            for(let i=0;i<symbols.length*2;i++) cards.push({symbol:symbols[i%symbols.length], flipped:false});
+            cards.sort(()=>Math.random()-0.5);
+            function draw(){
+                ctx.clearRect(0,0,canvas.width,canvas.height);
+                for(let i=0;i<cards.length;i++){
+                    let x=30+(i%cols)*(cardW+gap), y=20+Math.floor(i/cols)*(cardH+gap);
+                    if(cards[i].flipped){
+                        ctx.fillStyle="#ecf0f1"; ctx.fillRect(x,y,cardW,cardH);
+                        ctx.font="40px sans-serif"; ctx.fillStyle="black"; ctx.textAlign="center"; ctx.fillText(cards[i].symbol, x+cardW/2, y+cardH/2+12);
+                    } else { ctx.fillStyle="#34495e"; ctx.fillRect(x,y,cardW,cardH); }
+                    ctx.strokeStyle="#66fcf1"; ctx.strokeRect(x,y,cardW,cardH);
+                }
+            }
+            canvas.addEventListener("click",(e)=>{
+                if(!active||lock) return;
+                const rect=canvas.getBoundingClientRect();
+                const mx=e.clientX-rect.left, my=e.clientY-rect.top;
+                for(let i=0;i<cards.length;i++){
+                    let x=30+(i%cols)*(cardW+gap), y=20+Math.floor(i/cols)*(cardH+gap);
+                    if(mx>=x && mx<=x+cardW && my>=y && my<=y+cardH && !cards[i].flipped){
+                        cards[i].flipped=true; draw();
+                        if(!first){ first=i; }
+                        else {
+                            if(cards[first].symbol===cards[i].symbol){
+                                pairsFound++; pairsSpan.textContent=pairsFound; first=null;
+                                if(pairsFound===symbols.length){ active=false; ctx.fillStyle="rgba(0,0,0,0.7)"; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.fillStyle="#2ecc71"; ctx.fillText("Победа!",canvas.width/2,canvas.height/2); }
+                            } else {
+                                lock=true;
+                                setTimeout(()=>{ cards[first].flipped=false; cards[i].flipped=false; first=null; lock=false; draw(); },600);
+                            }
+                        }
+                        break;
+                    }
+                }
+            });
+            draw();
+            currentGame={stop:()=>{ active=false; }};
+        }
+
+        function start2D_Tetris() {
+            gameArea.innerHTML += `<div class="game-ui">Счёт: <span id="tetrisScore">0</span></div>
+                                   <canvas id="gameCanvas" width="300" height="400"></canvas>`;
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+            const scoreSpan = document.getElementById('tetrisScore');
+            const cols=10, rows=20, cell=20;
+            let board=Array(rows).fill().map(()=>Array(cols).fill(0));
+            const pieces = [[[1,1,1,1]],[[1,1],[1,1]],[[0,1,0],[1,1,1]],[[1,0,0],[1,1,1]],[[0,0,1],[1,1,1]],[[1,1,0],[0,1,1]],[[0,1,1],[1,1,0]]];
+            let cur, curX, curY, active=true, score=0, gameOver=false;
+            function spawn(){
+                cur=pieces[Math.floor(Math.random()*pieces.length)];
+                curX=Math.floor(cols/2)-Math.floor(cur[0].length/2);
+                curY=0;
+                if(!valid(0,0)){ gameOver=true; active=false; }
+            }
+            function valid(offX,offY){
+                for(let y=0;y<cur.length;y++) for(let x=0;x<cur[y].length;x++) if(cur[y][x] && (curY+offY+y>=rows || curX+offX+x<0 || curX+offX+x>=cols || board[curY+offY+y][curX+offX+x])) return false;
+                return true;
+            }
+            function lock(){
+                for(let y=0;y<cur.length;y++) for(let x=0;x<cur[y].length;x++) if(cur[y][x]) board[curY+y][curX+x]=1;
+                for(let y=rows-1;y>=0;y--) if(board[y].every(cell=>cell===1)){ board.splice(y,1); board.unshift(new Array(cols).fill(0)); score+=10; scoreSpan.textContent=score; }
+                spawn();
+            }
+            function drop(){ if(valid(0,1)) curY++; else lock(); }
+            function move(dir){ if(valid(dir,0)) curX+=dir; }
+            function rotate(){
+                let newP=cur[0].map((_,i)=>cur.map(row=>row[i]).reverse());
+                let old=cur; cur=newP; if(!valid(0,0)) cur=old;
+            }
+            let dropInterval=500, lastDrop=0;
+            function loop(ts){
+                if(!active) return;
+                if(!gameOver && ts-lastDrop>dropInterval){ drop(); lastDrop=ts; }
+                ctx.clearRect(0,0,canvas.width,canvas.height);
+                for(let y=0;y<rows;y++) for(let x=0;x<cols;x++) if(board[y][x]){ ctx.fillStyle="#2ecc71"; ctx.fillRect(x*cell,y*cell,cell-1,cell-1); }
+                if(cur) for(let y=0;y<cur.length;y++) for(let x=0;x<cur[y].length;x++) if(cur[y][x]){ ctx.fillStyle="#e67e22"; ctx.fillRect((curX+x)*cell,(curY+y)*cell,cell-1,cell-1); }
+                if(gameOver){ ctx.fillStyle="rgba(0,0,0,0.7)"; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.fillStyle="#e74c3c"; ctx.fillText("Game Over",canvas.width/2,canvas.height/2); }
+                else requestAnimationFrame(loop);
+            }
+            spawn();
+            requestAnimationFrame(loop);
+            const onKey=(e)=>{ if(e.key==="ArrowLeft") move(-1); if(e.key==="ArrowRight") move(1); if(e.key==="ArrowDown") drop(); if(e.key==="ArrowUp") rotate(); e.preventDefault(); };
+            window.addEventListener("keydown",onKey);
+            currentGame={stop:()=>{ active=false; window.removeEventListener("keydown",onKey); }};
+        }
+
+        function start2D_Snake() {
+            gameArea.innerHTML += `<div class="game-ui">Счёт: <span id="snakeScore">0</span></div>
+                                   <canvas id="gameCanvas" width="400" height="400"></canvas>`;
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+            const scoreSpan = document.getElementById('snakeScore');
+            const gridSize=20, tileCount=canvas.width/gridSize;
+            let snake=[{x:10,y:10}], food={}, dir={x:0,y:0}, nextDir={x:0,y:0}, score=0, active=true, gameOver=false, speed=120, lastUpdate=0;
+            function randomFood(){ food={x:Math.floor(Math.random()*tileCount), y:Math.floor(Math.random()*tileCount)}; if(snake.some(s=>s.x===food.x&&s.y===food.y)) randomFood(); }
+            randomFood();
+            function loop(ts){
+                if(!active) return;
+                if(ts-lastUpdate>speed){ lastUpdate=ts; dir=nextDir;
+                    const head={x:snake[0].x+dir.x, y:snake[0].y+dir.y};
+                    if(head.x<0||head.x>=tileCount||head.y<0||head.y>=tileCount||snake.some(s=>s.x===head.x&&s.y===head.y)){ gameOver=true; active=false; }
+                    if(!gameOver){ snake.unshift(head); if(head.x===food.x&&head.y===food.y){ score+=10; scoreSpan.textContent=score; randomFood(); } else snake.pop(); }
+                }
+                ctx.clearRect(0,0,canvas.width,canvas.height);
+                ctx.fillStyle="#e74c3c"; ctx.fillRect(food.x*gridSize, food.y*gridSize, gridSize-2, gridSize-2);
+                ctx.fillStyle="#2ecc71"; snake.forEach(s=>ctx.fillRect(s.x*gridSize, s.y*gridSize, gridSize-2, gridSize-2));
+                if(gameOver){ ctx.fillStyle="rgba(0,0,0,0.7)"; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.fillStyle="#e74c3c"; ctx.font="30px sans-serif"; ctx.fillText("Game Over",canvas.width/2,canvas.height/2); }
+                else requestAnimationFrame(loop);
+            }
+            requestAnimationFrame(loop);
+            const onKey=(e)=>{ if(e.key==="ArrowUp"&&dir.y===0) nextDir={x:0,y:-1}; else if(e.key==="ArrowDown"&&dir.y===0) nextDir={x:0,y:1}; else if(e.key==="ArrowLeft"&&dir.x===0) nextDir={x:-1,y:0}; else if(e.key==="ArrowRight"&&dir.x===0) nextDir={x:1,y:0}; e.preventDefault(); };
+            window.addEventListener("keydown",onKey);
+            currentGame={stop:()=>{ active=false; window.removeEventListener("keydown",onKey); }};
+        }
+
+        function start2D_Puzzle15() {
+            gameArea.innerHTML += `<div class="game-ui">Ходов: <span id="puzzleMoves">0</span></div>
+                                   <div class="puzzle-grid" id="puzzleGrid"></div>`;
+            const gridEl = document.getElementById('puzzleGrid');
+            const movesSpan = document.getElementById('puzzleMoves');
+            let tiles = [...Array(16).keys()];
+            do { for (let i = tiles.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [tiles[i], tiles[j]] = [tiles[j], tiles[i]]; } }
+            while (!(tiles.reduce((inv, v, i, arr) => inv + arr.slice(i+1).filter(x => x && v && v > x).length, 0) % 2 === 0) || tiles.every((v,i)=>v===i+1||(i===15&&v===0)));
+            let emptyIndex = tiles.indexOf(0), moves = 0, active = true;
+            function render(){
+                gridEl.innerHTML = '';
+                for(let i=0;i<16;i++){
+                    const tile = document.createElement('div');
+                    tile.className = 'puzzle-tile' + (tiles[i]===0?' empty':'');
+                    tile.textContent = tiles[i]? tiles[i]:'';
+                    if(tiles[i]!==0) tile.addEventListener('click',()=>moveTile(i));
+                    gridEl.appendChild(tile);
+                }
+                movesSpan.textContent = moves;
+                if(active && tiles.every((v,i)=>v===i+1||(i===15&&v===0))){ active=false; alert('Победа! Ходов: '+moves); }
+            }
+            function moveTile(i){
+                if(!active) return;
+                const row=Math.floor(i/4), col=i%4, eRow=Math.floor(emptyIndex/4), eCol=emptyIndex%4;
+                if((Math.abs(row-eRow)===1&&col===eCol)||(Math.abs(col-eCol)===1&&row===eRow)){
+                    [tiles[i],tiles[emptyIndex]]=[tiles[emptyIndex],tiles[i]]; emptyIndex=i; moves++; render();
+                }
+            }
+            render();
+            currentGame={stop:()=>{ active=false; }};
+        }
+
+        function start2D_Quiz() {
+            gameArea.innerHTML += `<div id="quizContainer"></div>`;
+            const container = document.getElementById('quizContainer');
+            const questions = [
+                { q: "Сколько планет в Солнечной системе?", options: ["7","8","9","10"], correct:1 },
+                { q: "Какая самая длинная река в мире?", options: ["Амазонка","Нил","Миссисипи","Янцзы"], correct:0 },
+                { q: "Сколько костей у взрослого человека?", options: ["206","156","256","186"], correct:0 },
+                { q: "Кто написал 'Войну и мир'?", options: ["Достоевский","Толстой","Пушкин","Гоголь"], correct:1 },
+                { q: "Химический символ золота?", options: ["Au","Ag","Fe","Pb"], correct:0 }
+            ];
+            let currentQ=0, score=0, active=true;
+            function showQuestion(){
+                if(currentQ>=questions.length){ container.innerHTML=`<h3 style="color:var(--accent)">Викторина завершена!</h3><p>Счёт: ${score} из ${questions.length}</p>`; active=false; return; }
+                const q=questions[currentQ];
+                container.innerHTML=`<h3>${q.q}</h3>${q.options.map((o,i)=>`<button class="quiz-option" data-idx="${i}">${o}</button>`).join('')}`;
+                document.querySelectorAll('.quiz-option').forEach(btn=>{
+                    btn.addEventListener('click', function(e){
+                        if(!active) return;
+                        const idx=parseInt(this.dataset.idx);
+                        if(idx===q.correct){ score++; this.style.background='#27ae60'; }
+                        else { this.style.background='#e74c3c'; document.querySelector(`.quiz-option[data-idx='${q.correct}']`).style.background='#2ecc71'; }
+                        active=false; setTimeout(()=>{ currentQ++; active=true; showQuestion(); },800);
+                    });
+                });
+            }
+            showQuestion();
+            currentGame={stop:()=>{ active=false; }};
+        }
+
+        function start2D_Maze() {
+            gameArea.innerHTML += `<div class="game-ui">Время: <span id="mazeTimer">0</span>с</div>
+                                   <canvas id="gameCanvas" width="450" height="450"></canvas>`;
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+            const timerSpan = document.getElementById('mazeTimer');
+            const cellSize=30, rows=15, cols=15;
+            const maze = [
+                [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+                [1,0,0,0,1,0,0,0,0,0,0,0,0,0,1],
+                [1,0,1,0,1,0,1,1,1,1,1,0,1,0,1],
+                [1,0,1,0,0,0,0,0,0,0,1,0,1,0,1],
+                [1,0,1,1,1,1,1,0,1,0,1,0,1,0,1],
+                [1,0,0,0,0,0,0,0,1,0,0,0,1,0,1],
+                [1,1,1,1,1,0,1,1,1,1,1,0,1,0,1],
+                [1,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                [1,0,1,1,1,0,1,1,1,0,1,0,1,0,1],
+                [1,0,0,0,1,0,0,0,1,0,0,0,1,0,1],
+                [1,1,1,0,1,1,1,0,1,0,1,0,1,0,1],
+                [1,0,0,0,1,0,0,0,0,0,1,0,0,0,1],
+                [1,0,1,0,1,0,1,1,1,0,1,1,1,0,1],
+                [1,0,0,0,0,0,0,0,1,0,0,0,0,0,1],
+                [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+            ];
+            let player={x:1,y:1}, finish={x:13,y:13}, active=true, gameOver=false, startTime=Date.now(), timerInterval;
+            function draw(){
+                ctx.clearRect(0,0,canvas.width,canvas.height);
+                for(let y=0;y<rows;y++) for(let x=0;x<cols;x++){ ctx.fillStyle=maze[y][x]===1?'#2c3e50':'#ecf0f1'; ctx.fillRect(x*cellSize,y*cellSize,cellSize-1,cellSize-1); }
+                ctx.fillStyle='#27ae60'; ctx.fillRect(finish.x*cellSize,finish.y*cellSize,cellSize-1,cellSize-1);
+                ctx.fillStyle='#66fcf1'; ctx.beginPath(); ctx.arc(player.x*cellSize+cellSize/2,player.y*cellSize+cellSize/2,cellSize/3,0,Math.PI*2); ctx.fill();
+            }
+            function move(dx,dy){
+                if(!active||gameOver) return;
+                const newX=player.x+dx, newY=player.y+dy;
+                if(newX>=0&&newX<cols&&newY>=0&&newY<rows&&maze[newY][newX]===0){ player.x=newX; player.y=newY; draw(); if(player.x===finish.x&&player.y===finish.y){ gameOver=true; active=false; clearInterval(timerInterval); ctx.fillStyle='rgba(0,0,0,0.7)'; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.fillStyle='#2ecc71'; ctx.font='30px sans-serif'; ctx.fillText('Победа!',canvas.width/2,canvas.height/2); } }
+            }
+            timerInterval=setInterval(()=>{ if(active&&!gameOver) timerSpan.textContent=Math.floor((Date.now()-startTime)/1000); },200);
+            draw();
+            const onKey=(e)=>{ if(e.key==='ArrowUp') move(0,-1); else if(e.key==='ArrowDown') move(0,1); else if(e.key==='ArrowLeft') move(-1,0); else if(e.key==='ArrowRight') move(1,0); e.preventDefault(); };
+            window.addEventListener('keydown',onKey);
+            currentGame={stop:()=>{ active=false; clearInterval(timerInterval); window.removeEventListener('keydown',onKey); }};
+        }
+
+        // Старт
+        renderGrid();
+    </script>
+</body>
+</html>
